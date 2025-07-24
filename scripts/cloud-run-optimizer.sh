@@ -143,38 +143,38 @@ analyze_service() {
     local memory_gb=$(echo "$memory_limit" | sed 's/Gi$//' | sed 's/Mi$//' | awk '{if($0 ~ /Mi$/) print $1/1024; else print $1}')
     
     # Calculate current costs (rough estimates)
-    local daily_cpu_cost=$(echo "$cpu_limit * 86400 * 0.000024" | bc -l 2>/dev/null || echo "0")
-    local daily_memory_cost=$(echo "$memory_gb * 86400 * 0.0000025" | bc -l 2>/dev/null || echo "0")
+    local daily_cpu_cost=$(awk "BEGIN {print $cpu_limit * 86400 * 0.000024}")
+    local daily_memory_cost=$(awk "BEGIN {print $memory_gb * 86400 * 0.0000025}")
     local always_on_cost=0
     if [ "$min_instances" -gt 0 ] 2>/dev/null; then
-        always_on_cost=$(echo "$min_instances * ($daily_cpu_cost + $daily_memory_cost)" | bc -l 2>/dev/null || echo "0")
+        always_on_cost=$(awk "BEGIN {print $min_instances * ($daily_cpu_cost + $daily_memory_cost)}")
     fi
     
-    local total_daily_cost=$(echo "$daily_cpu_cost + $daily_memory_cost + $always_on_cost" | bc -l 2>/dev/null || echo "0")
+    local total_daily_cost=$(awk "BEGIN {print $daily_cpu_cost + $daily_memory_cost + $always_on_cost}")
     
     # Identify optimization opportunities
     local optimizations=()
     local potential_savings=0
     
     # Check for over-provisioning (conservative assumptions)
-    if (( $(echo "$cpu_limit > 1" | bc -l) )); then
-        local new_cpu=$(echo "$cpu_limit * (100 - $PERCENTAGE_REDUCTION) / 100" | bc -l)
-        local cpu_savings=$(echo "($cpu_limit - $new_cpu) * 86400 * 0.000024" | bc -l)
+    if (( $(awk "BEGIN {print ($cpu_limit > 1)}") )); then
+        local new_cpu=$(awk "BEGIN {print $cpu_limit * (100 - $PERCENTAGE_REDUCTION) / 100}")
+        local cpu_savings=$(awk "BEGIN {print ($cpu_limit - $new_cpu) * 86400 * 0.000024}")
         optimizations+=("Reduce CPU: $cpu_limit → $new_cpu cores (-$PERCENTAGE_REDUCTION%) [\$$cpu_savings/day]")
-        potential_savings=$(echo "$potential_savings + $cpu_savings" | bc -l)
+        potential_savings=$(awk "BEGIN {print $potential_savings + $cpu_savings}")
     fi
     
-    if (( $(echo "$memory_gb > 1" | bc -l) )); then
-        local new_memory=$(echo "$memory_gb * (100 - $PERCENTAGE_REDUCTION) / 100" | bc -l)
-        local memory_savings=$(echo "($memory_gb - $new_memory) * 86400 * 0.0000025" | bc -l)
+    if (( $(awk "BEGIN {print ($memory_gb > 1)}") )); then
+        local new_memory=$(awk "BEGIN {print $memory_gb * (100 - $PERCENTAGE_REDUCTION) / 100}")
+        local memory_savings=$(awk "BEGIN {print ($memory_gb - $new_memory) * 86400 * 0.0000025}")
         optimizations+=("Reduce Memory: ${memory_gb}GB → ${new_memory}GB (-$PERCENTAGE_REDUCTION%) [\$$memory_savings/day]")
-        potential_savings=$(echo "$potential_savings + $memory_savings" | bc -l)
+        potential_savings=$(awk "BEGIN {print $potential_savings + $memory_savings}")
     fi
     
     # Check always-on costs
     if [ "$min_instances" -gt 0 ] 2>/dev/null; then
         optimizations+=("Set minInstances: $min_instances → 0 (eliminate always-on cost) [\$$always_on_cost/day]")
-        potential_savings=$(echo "$potential_savings + $always_on_cost" | bc -l)
+        potential_savings=$(awk "BEGIN {print $potential_savings + $always_on_cost}")
     fi
     
     # Check timeout optimization
@@ -288,8 +288,8 @@ optimize_services() {
         local daily_cost=$(echo "$service" | jq -r .costs.daily_total)
         local potential_savings=$(echo "$service" | jq -r .potential_daily_savings)
         
-        total_current_cost=$(echo "$total_current_cost + $daily_cost" | bc -l)
-        total_potential_savings=$(echo "$total_potential_savings + $potential_savings" | bc -l)
+        total_current_cost=$(awk "BEGIN {print $total_current_cost + $daily_cost}")
+        total_potential_savings=$(awk "BEGIN {print $total_potential_savings + $potential_savings}")
         
         if [ "$optimization_count" -gt 0 ]; then
             echo -e "${CYAN}📦 $project/$service_name ($region)${NC}"
@@ -321,14 +321,14 @@ optimize_services() {
                     local cpu=$(echo "$current_config" | jq -r .cpu)
                     local memory=$(echo "$current_config" | jq -r .memory)
                     
-                    if (( $(echo "$cpu > 1" | bc -l) )); then
-                        local new_cpu=$(echo "$cpu * (100 - $PERCENTAGE_REDUCTION) / 100" | bc -l)
+                    if (( $(awk "BEGIN {print ($cpu > 1)}") )); then
+                        local new_cpu=$(awk "BEGIN {print $cpu * (100 - $PERCENTAGE_REDUCTION) / 100}")
                         apply_optimization "$project" "$service_name" "$region" "cpu" "$new_cpu"
                     fi
                     
                     if [[ "$memory" =~ ^[0-9]+Gi$ ]] && [ "${memory%Gi}" -gt 1 ]; then
                         local memory_val="${memory%Gi}"
-                        local new_memory=$(echo "$memory_val * (100 - $PERCENTAGE_REDUCTION) / 100" | bc -l)
+                        local new_memory=$(awk "BEGIN {print $memory_val * (100 - $PERCENTAGE_REDUCTION) / 100}")
                         apply_optimization "$project" "$service_name" "$region" "memory" "${new_memory}Gi"
                     fi
                 fi
@@ -348,10 +348,10 @@ optimize_services() {
     echo "Services analyzed: $services_count"
     echo "Current daily cost: \$$(printf "%.2f" "$total_current_cost")"
     echo "Potential daily savings: \$$(printf "%.2f" "$total_potential_savings")"
-    echo "Potential monthly savings: \$$(echo "$total_potential_savings * 30" | bc -l | xargs printf "%.2f")"
+    echo "Potential monthly savings: \$$(awk "BEGIN {printf \"%.2f\", $total_potential_savings * 30}")"
     
     if [ "$total_potential_savings" != "0" ]; then
-        local savings_percentage=$(echo "scale=1; $total_potential_savings * 100 / $total_current_cost" | bc -l)
+        local savings_percentage=$(awk "BEGIN {printf \"%.1f\", $total_potential_savings * 100 / $total_current_cost}")
         echo "Potential savings: ${savings_percentage}%"
     fi
     
@@ -385,9 +385,10 @@ for project in $PROJECTS; do
     gcloud config set project "$project" --quiet
     
     # Get services in this project
+    local regions=""
     if [ -n "$TARGET_SERVICE" ]; then
         # Analyze specific service
-        local regions=$(gcloud run services list --filter="metadata.name:$TARGET_SERVICE" --format="value(metadata.labels.'cloud\.googleapis\.com/location')" | sort -u | grep -v "^$")
+        regions=$(gcloud run services list --filter="metadata.name:$TARGET_SERVICE" --format="value(metadata.labels.'cloud\.googleapis\.com/location')" | sort -u | grep -v "^$")
         for region in $regions; do
             analyze_service "$project" "$TARGET_SERVICE" "$region"
         done
