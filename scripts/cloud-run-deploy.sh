@@ -62,7 +62,6 @@ echo -e "${YELLOW}Step 3: Updating deployment configuration...${NC}"
 
 # Generate deployment configuration from template
 ./scripts/generate-configs.sh
-cp cloud-run-deployment-generated.yaml cloud-run-deployment-final.yaml
 
 echo -e "${GREEN}✅ Deployment configuration ready${NC}"
 echo ""

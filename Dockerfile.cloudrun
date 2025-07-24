@@ -1,4 +1,4 @@
-FROM n8nio/n8n:latest
+FROM --platform=linux/amd64 n8nio/n8n:latest
 
 # Install additional packages needed for Cloud Run
 USER root
@@ -28,9 +28,6 @@ ENV N8N_HOST=0.0.0.0
 ENV N8N_PROTOCOL=https
 ENV EXECUTIONS_MODE=regular
 ENV N8N_METRICS=true
-
-# Health checks handled by Cloud Run liveness probes
-# No Docker HEALTHCHECK needed - Cloud Run manages this
 
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]

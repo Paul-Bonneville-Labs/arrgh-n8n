@@ -42,6 +42,11 @@ node_modules/
 dist/
 build/
 
+# Generated deployment files
+cloud-run-deployment-generated.yaml
+deployment-info.txt
+deployment-summary.txt
+
 # Terraform - SECURITY: Infrastructure files should not be in public repos
 terraform/
 .terraform/
