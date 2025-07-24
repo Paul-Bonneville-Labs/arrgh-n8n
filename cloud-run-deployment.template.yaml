@@ -15,8 +15,8 @@ spec:
         autoscaling.knative.dev/maxScale: "10"
         # VPC connector removed - using public IP Cloud SQL
         # Resource limits (POC optimized)
-        run.googleapis.com/memory: "1Gi"
-        run.googleapis.com/cpu: "1"
+        run.googleapis.com/memory: "512Mi"
+        run.googleapis.com/cpu: "0.5"
         # CPU allocation during request processing
         run.googleapis.com/cpu-throttling: "false"
         # Timeout for requests (n8n workflows can take time)
@@ -151,11 +151,11 @@ spec:
         # Resource requests (POC optimized)
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "1"
+            memory: "256Mi"
+            cpu: "0.25"
           limits:
-            memory: "1Gi"
-            cpu: "1"
+            memory: "512Mi"
+            cpu: "0.5"
         
         # Liveness probe - uses n8n's web interface as health check
         livenessProbe:
