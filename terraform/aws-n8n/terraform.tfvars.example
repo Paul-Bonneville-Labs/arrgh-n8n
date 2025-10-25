@@ -1,0 +1,33 @@
+# AWS Configuration
+aws_region   = "us-east-1"
+project_name = "n8n"
+environment  = "production"
+
+# EC2 Configuration
+ec2_instance_type = "t4g.small" # 2 vCPU, 2 GB RAM - $13/month
+ebs_volume_size   = 8           # GB
+ssh_key_name      = "your-ssh-key-name"
+ssh_allowed_ips   = ["0.0.0.0/0"] # SECURITY: Change to your IP address
+
+# RDS Configuration
+rds_instance_class      = "db.t4g.micro" # 1 vCPU, 1 GB RAM - Free tier eligible
+rds_allocated_storage   = 20             # GB
+rds_max_allocated_storage = 100          # GB (autoscaling limit)
+backup_retention_days   = 7
+skip_final_snapshot     = false
+multi_az                = false # Set to true for production HA (adds cost)
+
+# Database Credentials
+db_name     = "n8n"
+db_username = "n8n"
+db_password = "CHANGE_THIS_STRONG_PASSWORD_12345" # REQUIRED: Change this!
+
+# n8n Configuration
+n8n_domain   = "n8n.yourdomain.com" # REQUIRED: Your domain
+n8n_password = "CHANGE_THIS_PASSWORD" # REQUIRED: Change this!
+
+# Monitoring (optional)
+alarm_email = "" # Add email to receive CloudWatch alerts
+
+# Backups (optional)
+enable_s3_backups = true
