@@ -1,14 +1,14 @@
 # n8n Self-Hosted Setup
 
-This repository provides configurations for running n8n both locally (for development) and on Google Cloud Run (for production).
+This repository provides configurations for running n8n both locally (for development) and on AWS (for production).
 
 ## Overview
 
 n8n is a workflow automation tool that allows you to connect various services and automate tasks. This setup includes:
 - Local development environment with Docker Compose
-- Production deployment on Google Cloud Run with Cloud SQL database
+- Production deployment on AWS EC2 with AWS RDS PostgreSQL database
 - Persistent storage for workflows and credentials
-- Automated scripts for easy deployment
+- Infrastructure as Code with Terraform
 
 ## Prerequisites
 
@@ -17,11 +17,11 @@ n8n is a workflow automation tool that allows you to connect various services an
 - Docker Compose
 - 4GB RAM available
 
-### Production (Google Cloud Run)
-- Google Cloud account with billing enabled
-- `gcloud` CLI installed and authenticated
-- Docker installed
-- Existing Cloud SQL PostgreSQL database (optional)
+### Production (AWS)
+- AWS account with billing enabled
+- AWS CLI installed and configured
+- Terraform installed
+- SSH key pair for EC2 access
 
 ## Local Development
 
@@ -59,133 +59,126 @@ To remove all data:
 docker-compose down -v
 ```
 
-## Production Deployment (Google Cloud Run)
+## Production Deployment (AWS)
 
 ### Cost Estimate
-- **Monthly cost**: ~$30-55 (optimized setup)
-- Includes: Cloud Run service, Cloud SQL database, Secret Manager
-- Features: Auto-scaling, SSL certificates, monitoring
+- **Monthly cost**: ~$29 (optimized setup)
+- Includes: EC2 t4g.small instance, RDS db.t4g.micro PostgreSQL, backups
+- Features: Caddy reverse proxy with auto-SSL, CloudWatch monitoring
 
-### 🚀 Quick Deployment
+### 🚀 Quick Deployment with Terraform
 
-For a complete step-by-step migration guide, see: **[Cloud Run Migration Guide](docs/guides/CLOUD-RUN-MIGRATION.md)**
+See the complete Terraform configuration in `terraform/aws-n8n/`
 
-#### Configuration Setup
-1. **Copy environment template**
+#### Prerequisites
+1. **Set up AWS credentials**
    ```bash
-   cp .env.example .env
+   aws configure
    ```
 
-2. **Edit configuration** (required values)
+2. **Create Terraform variables**
    ```bash
-   # Edit .env with your specific values
-   PROJECT_ID=your-gcp-project-id
-   REGION=us-central1
-   # ... other variables
+   cd terraform/aws-n8n
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars with your values
    ```
 
-#### One-Command Setup
+#### Deploy Infrastructure
 ```bash
-# 1. Set up infrastructure
-./scripts/cloud-run-setup.sh
+cd terraform/aws-n8n
 
-# 2. Configure secrets (requires .env file)
-./scripts/cloud-run-secrets.sh
+# Initialize Terraform
+terraform init
 
-# 3. Deploy n8n
-./scripts/cloud-run-deploy.sh
+# Review planned changes
+terraform plan
+
+# Deploy infrastructure
+terraform apply
 ```
-
-**Note**: The deployment script automatically generates the final Cloud Run configuration from the template file using your environment variables. No manual configuration file editing is required.
 
 ### Production Features
-- **Auto-scaling**: 1-10 instances based on traffic
-- **High performance**: 2 CPU, 2GB RAM per instance
-- **Secure**: All credentials in Google Secret Manager
-- **SSL**: Automatic HTTPS with Google-managed certificates
-- **Monitoring**: Integrated Cloud Run monitoring and logging
-- **Cost-optimized**: Direct Cloud SQL connection (no VPC overhead)
+- **EC2 Instance**: ARM-based t4g.small for cost efficiency
+- **RDS Database**: PostgreSQL 14.13 with automated backups
+- **SSL/TLS**: Automatic HTTPS via Caddy reverse proxy
+- **Monitoring**: CloudWatch logs and metrics
+- **Backups**: Daily automated backups to S3 (optional)
+- **Security**: AWS Secrets Manager for credentials, IAM roles
 
 ### Custom Domain Setup
-See: **[DNS Update Guide](docs/guides/DNS-UPDATE-GUIDE.md)**
-
-```bash
-gcloud beta run domain-mappings create \
-  --service n8n-app \
-  --domain your-domain.com \
-  --region us-central1
-```
+The domain is configured automatically via Caddy. Update DNS to point to the EC2 instance Elastic IP.
 
 ## Project Structure
 
 ```
 arrgh-n8n/
 ├── docker-compose.yml                 # Local development setup
-├── Dockerfile.cloudrun                # Cloud Run optimized container
-├── cloud-run-deployment.template.yaml # Knative service template with env variables
 ├── .env.example                       # Environment variables template
-├── config/
-│   └── environments/                  # Environment-specific configurations
-│       ├── production.env            # Production defaults
-│       └── development.env           # Development defaults
-├── scripts/                           # Deployment automation
-│   ├── cloud-run-setup.sh            # Infrastructure setup
-│   ├── cloud-run-secrets.sh          # Secret Manager configuration
-│   ├── cloud-run-deploy.sh           # Build and deployment
-│   ├── generate-configs.sh           # Template processing utility
-│   └── monitor-domain.sh              # Domain migration monitoring
+├── terraform/
+│   └── aws-n8n/                       # AWS infrastructure as code
+│       ├── main.tf                    # Main Terraform configuration
+│       ├── variables.tf               # Input variables
+│       ├── outputs.tf                 # Output values
+│       ├── secrets.tf                 # AWS Secrets Manager config
+│       ├── user-data.sh               # EC2 bootstrap script
+│       └── terraform.tfvars.example   # Example variables file
 ├── docs/
-│   ├── guides/                        # Migration and setup guides
-│   └── audit/                         # Migration verification
+│   ├── guides/                        # Setup guides
+│   └── audit/                         # Infrastructure documentation
 ├── workflows/                         # n8n workflow backups
 └── README.md                          # This file
 ```
 
-## Configuration Architecture
+## Infrastructure as Code
 
-This deployment uses **environment variable substitution** for secure, flexible configuration:
+This deployment uses **Terraform** for infrastructure management:
 
-- **Template files** (`cloud-run-deployment.template.yaml`) contain variables like `${PROJECT_ID}`, `${REGION}`
-- **Environment files** (`.env`, `config/environments/*.env`) define actual values  
-- **Generated files** are created dynamically by `generate-configs.sh` during deployment
-- **Cloud Run** deploys using the generated Knative service definitions
+- **Terraform modules** define all AWS resources (EC2, RDS, security groups, IAM roles)
+- **Variable files** (`terraform.tfvars`) contain environment-specific values
+- **State management** tracks infrastructure changes
+- **User-data scripts** automate EC2 configuration with Docker Compose
 
 This approach ensures:
-✅ **No hardcoded credentials** in source control  
-✅ **Easy multi-environment deployments** (dev, staging, prod)  
-✅ **Secure secret management** via Google Secret Manager  
+✅ **No hardcoded credentials** in source control
+✅ **Reproducible infrastructure** across environments
+✅ **Secure secret management** via AWS Secrets Manager
+✅ **Version-controlled infrastructure** changes
 
-See the [Configuration Guide](docs/guides/CONFIGURATION-GUIDE.md) for complete setup instructions.
+See the Terraform configuration in `terraform/aws-n8n/` for details.
 
 ## Database Configuration
 
 This setup supports flexible database options:
 - **Local**: PostgreSQL container (development)
-- **Production**: Google Cloud SQL PostgreSQL
-- **Connection**: Direct public IP connection (cost-optimized)
-- **Security**: SSL/TLS encryption, Secret Manager for credentials
+- **Production**: AWS RDS PostgreSQL 14.13
+- **Connection**: Private VPC connection for security
+- **Security**: IAM authentication support, Secrets Manager for credentials
+- **Backups**: Automated daily backups with 7-day retention
 
 ## Security Considerations
 
-1. **Credentials**: All stored in Google Secret Manager
-2. **Network**: Direct SSL/TLS connection to Cloud SQL
-3. **Access**: Basic auth with strong passwords
-4. **Updates**: Latest n8n version (1.98.1)
-5. **Monitoring**: Cloud Run security scanning enabled
+1. **Credentials**: All stored in AWS Secrets Manager
+2. **Network**: Private VPC connection to RDS database
+3. **Access**: Basic auth with strong passwords, SSH key-based EC2 access
+4. **Updates**: Latest n8n version via Docker
+5. **Monitoring**: CloudWatch logs and metrics enabled
+6. **Encryption**: RDS encryption at rest (configurable)
 
-## Migration from Render/Other Platforms
+## Deployment Architecture
 
-This repository includes complete migration guides and automation:
+### Current Production Setup
+- **Platform**: AWS (us-west-2)
+- **Compute**: EC2 t4g.small instance (ARM-based)
+- **Database**: RDS PostgreSQL 14.13 (db.t4g.micro)
+- **Reverse Proxy**: Caddy (automatic HTTPS)
+- **Domain**: n8n.paulbonneville.com
 
-- **[Migration Guide](docs/guides/CLOUD-RUN-MIGRATION.md)** - Complete step-by-step process
-- **[Migration Success Report](docs/guides/migration-success.md)** - What to expect
-- **[Migration Audit](docs/audit/MIGRATION-AUDIT.md)** - Verification of scripts and processes
-
-### Migration Benefits
-- **Cost savings**: ~$553/month saved from original setup
-- **Better performance**: Dedicated resources, auto-scaling
-- **Enhanced monitoring**: Cloud Run native tools
-- **SSL included**: Google-managed certificates
+### Benefits
+- **Cost efficiency**: ~$29/month total infrastructure cost
+- **Performance**: Dedicated ARM-based instances
+- **Monitoring**: CloudWatch integration
+- **SSL/TLS**: Automatic certificate management via Caddy
+- **Backups**: Automated RDS backups with point-in-time recovery
 
 ## Troubleshooting
 
@@ -193,10 +186,10 @@ This repository includes complete migration guides and automation:
 - **Port 5678 in use**: Change port in docker-compose.yml
 - **Database connection failed**: Ensure PostgreSQL container is running
 
-### Cloud Run Issues
-- **Service not starting**: Check logs with `gcloud run logs read --service=n8n-app`
-- **Database connection failed**: Verify Cloud SQL credentials in Secret Manager
-- **Build failures**: Check Docker platform (must be linux/amd64)
+### AWS Issues
+- **Service not starting**: Check logs with `ssh ubuntu@<ip> "docker logs n8n"`
+- **Database connection failed**: Verify RDS credentials in AWS Secrets Manager
+- **EC2 access issues**: Ensure SSH key is configured and security groups allow access
 
 ### Common Commands
 
@@ -205,62 +198,69 @@ This repository includes complete migration guides and automation:
 docker-compose logs -f n8n           # View logs
 docker-compose restart n8n           # Restart n8n
 
-# Cloud Run
-gcloud run services list             # List services
-gcloud run logs read --service=n8n-app  # View logs
-gcloud run services describe n8n-app    # Service details
+# AWS Production
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip> "docker logs n8n"    # View logs
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip> "docker restart n8n" # Restart n8n
+aws rds describe-db-instances --region us-west-2                       # Check RDS status
 ```
 
 ## Cost Optimization
 
 This setup is optimized for cost efficiency:
 
-1. **No VPC Connector**: Direct Cloud SQL connection saves ~$518/month
-2. **Right-sized resources**: 2 CPU, 2GB RAM for optimal performance
-3. **Auto-scaling**: Pay only for what you use
-4. **Shared infrastructure**: Reuse existing Cloud SQL databases
+1. **ARM-based instances**: t4g instances offer better price/performance
+2. **Right-sized resources**: t4g.small EC2, db.t4g.micro RDS
+3. **Single-cloud architecture**: All resources in AWS (no cross-cloud egress)
+4. **Automated backups**: 7-day RDS backup retention included
 
 ## Monitoring & Maintenance
 
 ### Performance Monitoring
 ```bash
 # Check service health
-gcloud run services describe n8n-app --region=us-central1
+curl https://n8n.paulbonneville.com/healthz
 
-# Monitor resource usage
-# Visit Google Cloud Console > Cloud Run > n8n-app > Metrics
+# Monitor resource usage via AWS CloudWatch
+aws cloudwatch get-metric-statistics --namespace N8N --region us-west-2
+
+# View EC2 metrics in AWS Console
 ```
 
 ### Updates
 ```bash
-# Update to latest n8n version
-./scripts/cloud-run-deploy.sh
+# SSH to EC2 instance
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip>
+
+# Pull latest n8n image and restart
+cd /home/ubuntu/n8n
+docker-compose pull
+docker-compose up -d
 ```
 
 ## Next Steps
 
-1. **Deploy**: Follow the [Migration Guide](docs/guides/CLOUD-RUN-MIGRATION.md)
-2. **Custom Domain**: Configure your domain with [DNS Guide](docs/guides/DNS-UPDATE-GUIDE.md)
+1. **Deploy**: Use Terraform in `terraform/aws-n8n/` directory
+2. **Custom Domain**: Update DNS A record to point to EC2 Elastic IP
 3. **Import Workflows**: Use the n8n API or web interface
-4. **Set up Monitoring**: Configure Cloud Run alerts
-5. **Cost Monitoring**: Set up billing alerts
+4. **Set up Monitoring**: Configure CloudWatch alarms
+5. **Cost Monitoring**: Set up AWS billing alerts
 
 ## Resources
 
 - [n8n Documentation](https://docs.n8n.io/)
-- [Google Cloud Run Documentation](https://cloud.google.com/run/docs)
-- [Cloud SQL Documentation](https://cloud.google.com/sql/docs)
-- [Migration Guides](docs/guides/)
+- [AWS EC2 Documentation](https://docs.aws.amazon.com/ec2/)
+- [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 
 ## Support
 
 For issues with:
 - **n8n**: Visit [n8n Community](https://community.n8n.io/)
-- **Google Cloud**: Check [Cloud Support](https://cloud.google.com/support)
-- **This setup**: Check the [guides](docs/guides/) or open an issue
+- **AWS**: Check [AWS Support](https://aws.amazon.com/support/)
+- **Terraform**: See [Terraform Documentation](https://www.terraform.io/docs)
 
 ---
 
-**Current Status**: ✅ Production ready on Google Cloud Run  
-**Last Updated**: July 2025  
-**Migration**: Successfully completed from Render.com
+**Current Status**: ✅ Production ready on AWS (us-west-2)
+**Last Updated**: October 2025
+**Platform**: AWS EC2 + RDS
