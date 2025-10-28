@@ -43,6 +43,8 @@ n8n is a workflow automation tool that allows you to connect various services an
    - Username: `admin`
    - Password: `password`
 
+   **Security Warning**: These are development-only credentials. Change them before exposing to any network.
+
 ### Local Features
 - PostgreSQL database included
 - Data persists between restarts
@@ -78,14 +80,14 @@ See the complete Terraform configuration in `terraform/aws-n8n/`
 
 2. **Create Terraform variables**
    ```bash
-   cd terraform/aws-n8n
+   cd .conductor/semarang/terraform/aws-n8n
    cp terraform.tfvars.example terraform.tfvars
    # Edit terraform.tfvars with your values
    ```
 
 #### Deploy Infrastructure
 ```bash
-cd terraform/aws-n8n
+cd .conductor/semarang/terraform/aws-n8n
 
 # Initialize Terraform
 terraform init
@@ -114,14 +116,16 @@ The domain is configured automatically via Caddy. Update DNS to point to the EC2
 arrgh-n8n/
 ├── docker-compose.yml                 # Local development setup
 ├── .env.example                       # Environment variables template
-├── terraform/
-│   └── aws-n8n/                       # AWS infrastructure as code
-│       ├── main.tf                    # Main Terraform configuration
-│       ├── variables.tf               # Input variables
-│       ├── outputs.tf                 # Output values
-│       ├── secrets.tf                 # AWS Secrets Manager config
-│       ├── user-data.sh               # EC2 bootstrap script
-│       └── terraform.tfvars.example   # Example variables file
+├── .conductor/
+│   └── semarang/
+│       └── terraform/
+│           └── aws-n8n/               # AWS infrastructure as code
+│               ├── main.tf            # Main Terraform configuration
+│               ├── variables.tf       # Input variables
+│               ├── outputs.tf         # Output values
+│               ├── secrets.tf         # AWS Secrets Manager config
+│               ├── user-data.sh       # EC2 bootstrap script
+│               └── terraform.tfvars.example
 ├── docs/
 │   ├── guides/                        # Setup guides
 │   └── audit/                         # Infrastructure documentation
@@ -144,7 +148,7 @@ This approach ensures:
 ✅ **Secure secret management** via AWS Secrets Manager
 ✅ **Version-controlled infrastructure** changes
 
-See the Terraform configuration in `terraform/aws-n8n/` for details.
+See the Terraform configuration in `.conductor/semarang/terraform/aws-n8n/` for details.
 
 ## Database Configuration
 
@@ -239,7 +243,7 @@ docker-compose up -d
 
 ## Next Steps
 
-1. **Deploy**: Use Terraform in `terraform/aws-n8n/` directory
+1. **Deploy**: Use Terraform in `.conductor/semarang/terraform/aws-n8n/` directory
 2. **Custom Domain**: Update DNS A record to point to EC2 Elastic IP
 3. **Import Workflows**: Use the n8n API or web interface
 4. **Set up Monitoring**: Configure CloudWatch alarms

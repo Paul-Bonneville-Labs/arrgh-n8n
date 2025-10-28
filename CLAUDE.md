@@ -14,7 +14,7 @@ The project uses AWS as the production platform for its cost efficiency, dedicat
 
 ### Dual Environment Design
 - **Local**: `docker-compose.yml` provides isolated development with bundled PostgreSQL
-- **Production (AWS)**: Terraform configuration in `terraform/aws-n8n/` deploys EC2 + RDS infrastructure
+- **Production (AWS)**: Terraform configuration in `.conductor/semarang/terraform/aws-n8n/` deploys EC2 + RDS infrastructure
 
 ### Configuration Strategy
 - Local uses hardcoded credentials in docker-compose.yml
@@ -51,7 +51,7 @@ docker-compose restart n8n
 ### AWS Production
 ```bash
 # Deploy infrastructure with Terraform
-cd terraform/aws-n8n
+cd .conductor/semarang/terraform/aws-n8n
 terraform init
 terraform plan
 terraform apply
@@ -92,7 +92,9 @@ AWS deployment configured for cost optimization (~$29/month):
 - URL: https://n8n.paulbonneville.com
 - Username: `admin`
 - Password: Configured in `/home/ubuntu/n8n/docker-compose.yml` on EC2 instance
-- SSH Access: `ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@44.253.69.204`
+- SSH Access: `ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip>`
+
+**Note**: The default local credentials (`admin`/`password`) should be changed in production. Update the password in the EC2 instance's docker-compose.yml file.
 
 ## Troubleshooting Context
 
