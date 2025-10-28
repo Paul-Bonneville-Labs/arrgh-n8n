@@ -6,25 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an n8n self-hosting setup supporting two deployment environments:
 - **Local development**: Docker Compose with PostgreSQL
-- **Production (Google Cloud Run)**: Google Cloud Run with Cloud SQL PostgreSQL (~$50/month optimized hosting)
+- **Production (AWS)**: AWS EC2 with RDS PostgreSQL (~$29/month optimized hosting)
 
-The project uses Google Cloud Run as the production platform for its scalability, cost optimization, and enterprise features.
+The project uses AWS as the production platform for its cost efficiency, dedicated resources, and Infrastructure as Code management via Terraform.
 
 ## Architecture
 
 ### Dual Environment Design
 - **Local**: `docker-compose.yml` provides isolated development with bundled PostgreSQL
-- **Production (Google Cloud Run)**: `cloud-run-deployment.yaml` deploys to Google Cloud Run with Cloud SQL database
+- **Production (AWS)**: Terraform configuration in `.conductor/semarang/terraform/aws-n8n/` deploys EC2 + RDS infrastructure
 
 ### Configuration Strategy
 - Local uses hardcoded credentials in docker-compose.yml
-- Google Cloud Run uses environment variables with Cloud SQL database and Google Secret Manager
+- AWS production uses Terraform for infrastructure management
+- EC2 instance configured via user-data script with Docker Compose
+- Credentials managed via AWS Secrets Manager
 - Both environments use the same n8n image (`n8nio/n8n:latest`)
 
 ### Database Architecture
 - **Local**: PostgreSQL 14 container with persistent volumes
-- **Production (Google Cloud Run)**: Cloud SQL PostgreSQL database (connection via Cloud SQL Auth Proxy)
-- Configuration divergence handled through environment-specific files and templates
+- **Production (AWS)**: RDS PostgreSQL 14.13 (db.t4g.micro) with private VPC connection
+- Infrastructure defined in Terraform, deployed via `terraform apply`
 
 ## Common Commands
 
@@ -46,34 +48,38 @@ docker-compose down -v
 docker-compose restart n8n
 ```
 
-### Google Cloud Run Production
+### AWS Production
 ```bash
-# Deploy to Google Cloud Run
-./scripts/cloud-run-deploy.sh
+# Deploy infrastructure with Terraform
+cd .conductor/semarang/terraform/aws-n8n
+terraform init
+terraform plan
+terraform apply
 
-# Monitor deployment status
-gcloud run services list --region=us-central1
+# SSH to EC2 instance
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip>
 
-# View service logs
-gcloud run logs read --service=n8n-app --region=us-central1
+# View n8n logs
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip> "docker logs n8n"
 
-# Update environment variables
-gcloud run services update n8n-app --region=us-central1 --update-env-vars="KEY=value"
+# Restart n8n
+ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip> "docker restart n8n"
 
-# Scale services (auto-scaling configured)
-gcloud run services update n8n-app --region=us-central1 --max-instances=10 --min-instances=1
+# Check RDS status
+aws rds describe-db-instances --region us-west-2 --db-instance-identifier n8n-db
 ```
 
 ## Key Configuration Points
 
-### Google Cloud Run Configuration
-Google Cloud Run deployment configured for cost optimization (~$50/month):
-- **Database**: Uses existing Cloud SQL PostgreSQL (35.225.58.181)
-- **n8n Service**: Cloud Run service with auto-scaling (1-10 instances)
-- **Resource allocation**: 2 CPU, 2GB RAM per instance
-- **Secrets**: Stored in Google Secret Manager
-- **Custom domain**: Configure via Cloud Run domain mappings
-- **SSL**: Automatically provisioned by Google
+### AWS Production Configuration
+AWS deployment configured for cost optimization (~$29/month):
+- **Compute**: EC2 t4g.small instance (ARM-based, 2 vCPU, 2GB RAM)
+- **Database**: RDS PostgreSQL 14.13 (db.t4g.micro)
+- **Region**: us-west-2 (Oregon)
+- **Reverse Proxy**: Caddy for automatic HTTPS
+- **Secrets**: AWS Secrets Manager for database credentials
+- **Custom domain**: n8n.paulbonneville.com (DNS A record to EC2 Elastic IP)
+- **SSL**: Automatically provisioned by Caddy
 
 ## Environment Access
 
@@ -82,10 +88,13 @@ Google Cloud Run deployment configured for cost optimization (~$50/month):
 - Username: `admin`
 - Password: `password`
 
-### Production Access (Google Cloud Run)
-- URL: https://n8n.paulbonneville.com (custom domain) or Cloud Run assigned URL
+### Production Access (AWS)
+- URL: https://n8n.paulbonneville.com
 - Username: `admin`
-- Password: Check Google Secret Manager for `n8n-basic-auth-password`
+- Password: Configured in `/home/ubuntu/n8n/docker-compose.yml` on EC2 instance
+- SSH Access: `ssh -i ~/.ssh/n8n-deploy-key.pem ubuntu@<ec2-ip>`
+
+**Note**: The default local credentials (`admin`/`password`) should be changed in production. Update the password in the EC2 instance's docker-compose.yml file.
 
 ## Troubleshooting Context
 
@@ -93,20 +102,22 @@ Google Cloud Run deployment configured for cost optimization (~$50/month):
 - Port 5678 conflicts: Modify `docker-compose.yml` ports section
 - Database connectivity: Ensure PostgreSQL container is healthy
 
-### Common Google Cloud Run Issues
-- Service startup failures: Check service logs with `gcloud run logs read --service=n8n-app`
-- Database connection errors: Verify Cloud SQL connectivity and Secret Manager configuration
-- Build failures: Ensure Docker image builds correctly for linux/amd64 platform
-- Environment variable issues: Check Secret Manager values and service configuration
+### Common AWS Production Issues
+- n8n not accessible: Check EC2 instance status and security group rules
+- Database connection errors: Verify RDS connectivity and credentials in docker-compose.yml
+- SSH access issues: Ensure using correct key (`~/.ssh/n8n-deploy-key.pem`) and security groups allow port 22
+- SSL certificate issues: Check Caddy logs with `ssh ubuntu@<ip> "sudo journalctl -u caddy"`
 
 ## Cost Considerations
 
-**Google Cloud Run deployment** cost-optimized hosting solution:
-- Estimated $50/month for production workload (reduced from $600/month)
-- Uses existing Cloud SQL database
-- Auto-scaling reduces costs during low usage
-- No VPC connector costs (direct database connection)
-- Enterprise features included (monitoring, logging, security)
+**AWS deployment** cost-optimized hosting solution:
+- Estimated $29/month for production workload
+  - EC2 t4g.small: ~$13/month
+  - RDS db.t4g.micro: ~$16/month
+- Single-cloud architecture (no cross-cloud egress charges)
+- ARM-based instances for better price/performance
+- 7-day automated RDS backups included
+- CloudWatch monitoring and logging included
 
 ## GitHub Actions & PR Standards
 
